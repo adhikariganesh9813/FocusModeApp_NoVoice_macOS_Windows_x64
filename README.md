@@ -9,7 +9,20 @@ Features:
 - Spoken status cues and end-of-session voice alert
 
 ## Install
-Installers are located in the `dist` folder after you build the app.
+Installers are located in the `dist` folder after you build the app (or under GitHub Releases if you download them there).
+
+macOS (DMG):
+1) Download `Focus.Mode-<version>-universal.dmg`.
+2) Double-click the DMG to open it.
+3) Drag "Focus Mode" into the Applications folder.
+4) Launch from Applications or Spotlight.
+5) If macOS blocks the app: go to System Settings > Privacy & Security > Open Anyway.
+
+Windows (EXE):
+1) Download `Focus.Mode.Setup.<version>-x64.exe`.
+2) Double-click the installer.
+3) Follow the on-screen prompts.
+4) Launch from the Start Menu.
 
 ## Tech Stack
 
@@ -17,14 +30,3 @@ Installers are located in the `dist` folder after you build the app.
 - HTML/CSS/JavaScript
 - Node.js
 - electron-builder (packaging)
-
-macOS:
-- Open the `Focus Mode-<version>-universal.dmg`.
-- Drag "Focus Mode" to the Applications folder.
-- Launch from Applications (or Spotlight).
-
-Windows:
-- Run `Focus Mode Setup <version>-x64.exe`.
-- Follow the installer prompts.
-- Launch from the Start Menu.
-
