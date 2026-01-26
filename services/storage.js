@@ -16,6 +16,7 @@
       lastSessionDate: null,
       pausedAt: null,
       accumulatedPauseTime: 0,
+      lastActiveAt: null,
       activityByDay: {},
       activityByMonth: {},
       activityByYear: {}

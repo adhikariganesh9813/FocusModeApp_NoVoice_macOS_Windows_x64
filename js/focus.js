@@ -21,6 +21,7 @@ let sessionStats = {
     lastSessionDate: null,
     pausedAt: null,
     accumulatedPauseTime: 0,
+    lastActiveAt: null,
     activityByDay: {},
     activityByMonth: {},
     activityByYear: {}
@@ -67,6 +68,7 @@ function initializeFocusMode() {
             const aggregates = await window.FocusStorage.loadAggregates();
             sessionStats = { ...sessionStats, ...aggregates };
         }
+        reconcileSessionTiming();
         updateStatsDisplay();
     }
 
@@ -202,6 +204,24 @@ function initializeFocusMode() {
         window.FocusStorage.migrateIfNeeded();
     }
 
+    function reconcileSessionTiming() {
+        if (!sessionStats.currentSessionStartTime) return;
+        const now = Date.now();
+        if (!sessionStats.pausedAt) {
+            const lastActiveAt = sessionStats.lastActiveAt;
+            if (lastActiveAt && lastActiveAt > sessionStats.currentSessionStartTime) {
+                const offlineMs = Math.max(0, now - lastActiveAt);
+                sessionStats.accumulatedPauseTime = (sessionStats.accumulatedPauseTime || 0) + offlineMs;
+            } else if (!lastActiveAt) {
+                const sinceStartMs = Math.max(0, now - sessionStats.currentSessionStartTime);
+                sessionStats.accumulatedPauseTime = (sessionStats.accumulatedPauseTime || 0) + sinceStartMs;
+            }
+            sessionStats.pausedAt = now;
+        }
+        sessionStats.lastActiveAt = now;
+        saveStats();
+    }
+
     // Complete a session
     function completeSession() {
         if (sessionStats.currentSessionStartTime) {
@@ -243,6 +263,7 @@ function initializeFocusMode() {
     // Reset all stats
     async function resetAllStats() {
         if (confirm('Are you sure you want to reset all stats? This will clear your current session data.')) {
+            sessionRuntimeSeconds = 0;
             sessionStats = {
                 totalFocusTimeSeconds: 0,
                 sessionsCompleted: 0,
@@ -253,6 +274,7 @@ function initializeFocusMode() {
                 lastSessionDate: null,
                 pausedAt: null,
                 accumulatedPauseTime: 0,
+                lastActiveAt: null,
                 activityByDay: {},
                 activityByMonth: {},
                 activityByYear: {}
@@ -822,6 +844,11 @@ function initializeFocusMode() {
         updateProgressRing();
         sessionStatusEl.textContent = 'Not Started';
         initStatsDashboard();
+    });
+
+    window.addEventListener('beforeunload', () => {
+        sessionStats.lastActiveAt = Date.now();
+        saveStats();
     });
 
     console.log('Focus mode initialized with time:', timeLeft); // Debug log
