@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta http-equiv="X-Content-Type-Options" content="nosniff">
+    <meta http-equiv="X-XSS-Protection" content="1; mode=block">
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+    <title>Focus Mode</title>
+    <link rel="icon" href="favicon.png?v=1" type="image/png">
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/focus.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <header>
+        <nav id="navbar">
+            <div class="nav-logo">Focus Mode</div>
+        </nav>
+    </header>
+
+    <main class="focus-mode">
+        <button id="enableSound" class="btn btn-primary" style="display:none;position:fixed;top:10px;left:50%;transform:translateX(-50%);z-index:2000;">Enable Sound</button>
+        <div id="soundModal" class="modal" style="display:none;z-index:3000;">
+            <div class="modal-content">
+                <h2>Enable Sound</h2>
+                <p>To get timer and water break notifications, please tap the button below to allow sound on your device.</p>
+                <button id="soundAllowBtn" class="btn btn-primary">Allow Sound</button>
+            </div>
+        </div>
+        <div class="focus-container">
+            <section class="timer-section">
+                <h1>Focus Mode</h1>
+                
+                <div class="timer-display">
+                    <div class="time">00:00</div>
+                    <div class="status">Ready to focus</div>
+                </div>
+
+                <div class="timer-controls">
+                    <button id="start" class="btn btn-primary">
+                        <i class="fas fa-play"></i> Start
+                    </button>
+                    <button id="pause" class="btn btn-secondary" disabled>
+                        <i class="fas fa-pause"></i> Pause
+                    </button>
+                    <button id="reset" class="btn btn-secondary">
+                        <i class="fas fa-redo"></i> Reset
+                    </button>
+                </div>
+            </section>
+
+            <section class="stats-section" id="statsSection">
+                <h2><i class="fas fa-chart-line"></i> Session Stats</h2>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon"><i class="fas fa-clock"></i></div>
+                        <div class="stat-value" id="totalFocusTime">0m</div>
+                        <div class="stat-label">Total Focus Time</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon"><i class="fas fa-check-circle"></i></div>
+                        <div class="stat-value" id="sessionsCompleted">0</div>
+                        <div class="stat-label">Sessions Completed</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon"><i class="fas fa-tint"></i></div>
+                        <div class="stat-value" id="waterBreaksTaken">0</div>
+                        <div class="stat-label">Water Breaks</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon"><i class="fas fa-fire"></i></div>
+                        <div class="stat-value" id="currentStreak">0</div>
+                        <div class="stat-label">Streak</div>
+                    </div>
+                </div>
+
+                <div class="progress-section">
+                    <h3><i class="fas fa-chart-pie"></i> Current Session Progress</h3>
+                    <div class="circular-progress">
+                        <svg class="progress-ring" width="72" height="72" viewBox="0 0 72 72">
+                            <circle class="progress-ring-circle-bg" stroke="#e0e0e0" stroke-width="6" fill="transparent" r="31" cx="36" cy="36"/>
+                            <circle class="progress-ring-circle" stroke="url(#gradient)" stroke-width="6" fill="transparent" r="31" cx="36" cy="36"/>
+                            <defs>
+                                <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                                    <stop offset="0%" style="stop-color:#4b6cb7;stop-opacity:1" />
+                                    <stop offset="100%" style="stop-color:#182848;stop-opacity:1" />
+                                </linearGradient>
+                            </defs>
+                        </svg>
+                        <div class="progress-text">
+                            <span id="progressPercent">0%</span>
+                        </div>
+                    </div>
+                    <div class="session-info">
+                        <div class="info-item">
+                            <span class="info-label">Session Time:</span>
+                            <span class="info-value" id="currentSessionTime">0m</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Status:</span>
+                            <span class="info-value" id="sessionStatus">Not Started</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="motivation-section">
+                    <div class="motivation-message" id="motivationMessage">
+                        <i class="fas fa-lightbulb"></i>
+                        <span>Start your focus session to build momentum!</span>
+                    </div>
+                </div>
+            </section>
+
+            <section class="settings-section">
+                <h2><i class="fas fa-cog"></i> Timer Settings</h2>
+                <div class="settings-group">
+                    <div class="setting">
+                        <label for="focusHours">Hours:</label>
+                        <input type="number" id="focusHours" value="0" min="0" max="24">
+                    </div>
+                    <div class="setting">
+                        <label for="focusMinutes">Minutes:</label>
+                        <input type="number" id="focusMinutes" value="0" min="0" max="59">
+                    </div>
+                </div>
+                <div class="setting">
+                    <label for="waterBreak">Water Break Reminder:</label>
+                    <div class="toggle">
+                        <input type="checkbox" id="waterBreak">
+                        <label for="waterBreak" class="toggle-label"></label>
+                    </div>
+                </div>
+                <div class="water-break-interval" id="waterBreakIntervalSetting">
+                    <h3>Water Break Interval</h3>
+                    <div class="settings-group">
+                        <div class="setting">
+                            <label for="waterBreakHours">Hours:</label>
+                            <input type="number" id="waterBreakHours" value="0" min="0" max="24">
+                        </div>
+                        <div class="setting">
+                            <label for="waterBreakMinutes">Minutes:</label>
+                            <input type="number" id="waterBreakMinutes" value="20" min="0" max="59">
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <div id="waterBreakModal" class="modal">
+                <div class="modal-content">
+                    <h2>Time for a Water Break! 💧</h2>
+                    <p>Take a moment to hydrate yourself.</p>
+                    <button id="drank" class="btn btn-primary">
+                        <i class="fas fa-check"></i> I Drank Water
+                    </button>
+                </div>
+            </div>
+            <div id="timerEndModal" class="modal">
+                <div class="modal-content">
+                    <h2>Time's Up! ⏰</h2>
+                    <p>Your focus session has ended.</p>
+                    <button id="closeTimer" class="btn btn-primary">
+                        <i class="fas fa-times"></i> Close
+                    </button>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Sound effects for timer end and water break notifications 
+         Using MP3 format for better browser compatibility -->
+    <audio id="timerEndSound" preload="auto" playsinline>
+        <source src="assets/audio/timer-end.mp3" type="audio/mp3">
+    </audio>
+    <audio id="waterBreakSound" preload="auto" playsinline>
+        <source src="assets/audio/water-break.mp3" type="audio/mp3">
+    </audio>
+
+    <script src="services/storage.js"></script>
+    <script src="services/analytics.js"></script>
+    <script src="js/focus.js"></script>
+</body>
+</html>

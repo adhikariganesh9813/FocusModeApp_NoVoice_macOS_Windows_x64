@@ -1,0 +1,612 @@
+/* CSS Variables */
+:root {
+    --text-color: #2c3e50;
+    --gradient-primary: linear-gradient(135deg, #4b6cb7 0%, #182848 100%);
+    --secondary-color: #f8f9fa;
+}
+
+/* Focus Mode Styles */
+
+.focus-mode {
+    padding: 60px 8px 12px;
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    background: linear-gradient(135deg, #f5f7fa 0%, #e4e9f2 100%);
+    overflow-x: hidden;
+    max-width: 100vw;
+}
+
+@media (max-width: 900px) {
+    .focus-mode {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    .focus-container {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        align-items: stretch;
+        max-width: 100%;
+    }
+    .timer-section, .settings-section, .stats-section {
+        max-width: 100%;
+        padding: 24px;
+        min-width: 0;
+    }
+    .stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+    }
+}
+
+/* Tablet specific (iPad) */
+@media (min-width: 768px) and (max-width: 900px) {
+    .stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    
+    .circular-progress {
+        width: 140px;
+        height: 140px;
+    }
+    
+    .progress-ring {
+        width: 140px;
+        height: 140px;
+    }
+}
+
+@media (max-width: 600px) {
+    .focus-mode {
+        padding: 70px 8px 16px;
+        min-height: 100vh;
+        margin-top: 0;
+    }
+    .focus-container {
+        flex-direction: column;
+        gap: 10px;
+        max-width: 100vw;
+        width: 100vw;
+        align-items: stretch;
+    }
+    .timer-section, .settings-section, .stats-section {
+        padding: 16px 12px;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        width: 100%;
+        min-width: 0;
+        max-width: 100vw;
+    }
+    .stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 8px;
+    }
+    .stat-card {
+        padding: 12px;
+    }
+    .stat-icon {
+        font-size: 1.5rem;
+    }
+    .stat-value {
+        font-size: 1.3rem;
+    }
+    .stat-label {
+        font-size: 0.75rem;
+    }
+    .circular-progress {
+        width: 100px;
+        height: 100px;
+    }
+    .progress-ring {
+        width: 100px;
+        height: 100px;
+    }
+    .progress-text {
+        font-size: 1.2rem;
+    }
+    .timer-section h1 {
+        font-size: 1.3rem;
+        margin-bottom: 10px;
+    }
+    .timer-display {
+        min-height: 50px;
+        padding: 4px;
+        width: 100%;
+        box-sizing: border-box;
+    }
+    .timer-display .time {
+        font-size: 1.05rem;
+        word-break: break-all;
+        margin: 6px 0;
+    }
+    .timer-display .status {
+        font-size: 0.9rem;
+        margin-top: 6px;
+    }
+    .timer-controls {
+        flex-direction: column;
+        gap: 4px;
+        margin: 6px 0;
+        width: 100%;
+    }
+    .settings-group {
+        flex-direction: column;
+        gap: 4px;
+        padding: 2px;
+        width: 100%;
+    }
+    .setting input[type="number"] {
+        width: 100%;
+        min-width: 0;
+        font-size: 16px; /* Prevents auto-zoom on iOS */
+        padding: 12px; /* Larger touch target */
+    }
+    .modal-content {
+        max-width: 95vw;
+        padding: 20px;
+        font-size: 0.95rem;
+        margin: 0 10px;
+    }
+    .btn {
+        font-size: 0.95rem;
+        padding: 12px 16px; /* Larger touch target */
+        width: 100%;
+        min-width: 0;
+        box-sizing: border-box;
+        min-height: 44px; /* iOS recommended touch target */
+        -webkit-tap-highlight-color: transparent;
+    }
+    .stats-section h2, .stats-section h3 {
+        font-size: 1.1rem;
+    }
+    .motivation-message {
+        font-size: 0.9rem;
+    }
+}
+        box-sizing: border-box;
+    }
+}
+
+/* Extra-small phones: make the clock a bit smaller */
+@media (max-width: 420px) {
+    .timer-display {
+        min-height: 40px;
+        padding: 3px;
+    }
+    .timer-display .time {
+        font-size: 0.9rem;
+    }
+}
+
+/* Very small phones (iPhone SE / 360-375px) */
+@media (max-width: 375px) {
+    .timer-display {
+        min-height: 36px;
+        padding: 2px;
+    }
+    .timer-display .time {
+        font-size: 0.85rem;
+    }
+}
+
+.focus-container {
+    display: grid;
+    grid-template-columns: minmax(240px, 340px) 1fr;
+    grid-template-areas:
+        "timer stats"
+        "settings stats";
+    gap: 10px;
+    width: 100%;
+    max-width: 100vw;
+    margin: 0 auto;
+    align-items: start;
+}
+
+.timer-section {
+    grid-area: timer;
+    background: white;
+    padding: 18px;
+    border-radius: 16px;
+    box-shadow: 0 8px 22px rgba(0, 0, 0, 0.08);
+    text-align: center;
+    min-width: 300px;
+}
+
+.stats-section {
+    grid-area: stats;
+    background: white;
+    padding: 12px;
+    border-radius: 12px;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.06);
+    min-width: 240px;
+}
+
+
+
+.stats-section h2 {
+    font-size: 1.08rem;
+    color: var(--text-color);
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.stats-section h3 {
+    font-size: 0.92rem;
+    color: var(--text-color);
+    margin: 10px 0 6px 0;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+    margin-bottom: 10px;
+}
+
+
+.stat-card {
+    background: linear-gradient(135deg, #f5f7fa 0%, #e4e9f2 100%);
+    padding: 10px;
+    border-radius: 9px;
+    text-align: center;
+    transition: transform 0.3s, box-shadow 0.3s;
+}
+
+.stat-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 5px 20px rgba(0, 0, 0, 0.15);
+}
+
+
+.stat-icon {
+    font-size: 1.25rem;
+    margin-bottom: 3px;
+    background: var(--gradient-primary);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+
+.stat-value {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--text-color);
+    margin: 0;
+}
+
+
+.stat-label {
+    font-size: 0.7rem;
+    color: #7f8c8d;
+    margin-top: 0;
+}
+
+
+.progress-section {
+    background: linear-gradient(135deg, #f5f7fa 0%, #e4e9f2 100%);
+    padding: 10px;
+    border-radius: 9px;
+    margin-top: 8px;
+}
+
+
+.circular-progress {
+    position: relative;
+    width: 72px;
+    height: 72px;
+    margin: 4px auto 6px;
+}
+
+.progress-ring {
+    width: 72px;
+    height: 72px;
+}
+
+.progress-ring-circle {
+    transition: stroke-dashoffset 0.5s ease;
+    transform: rotate(-90deg);
+    transform-origin: 50% 50%;
+    stroke-dasharray: 326.73;
+    stroke-dashoffset: 326.73;
+    stroke-linecap: round;
+}
+
+
+.progress-text {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 0.86rem;
+    font-weight: 700;
+    color: var(--text-color);
+}
+
+
+.session-info {
+    margin-top: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+
+.info-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 10px;
+    background: white;
+    border-radius: 8px;
+}
+
+.info-label {
+    font-weight: 600;
+    color: var(--text-color);
+}
+
+.info-value {
+    color: #3498db;
+    font-weight: 700;
+}
+
+
+.motivation-section {
+    margin-top: 8px;
+    padding: 8px;
+    background: linear-gradient(135deg, #4b6cb7 0%, #182848 100%);
+    border-radius: 9px;
+    color: white;
+}
+
+
+.motivation-message {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 0.86rem;
+    line-height: 1.35;
+}
+
+
+.motivation-message i {
+    font-size: 0.9rem;
+    color: #f39c12;
+}
+
+.settings-section {
+    grid-area: settings;
+    background: white;
+    padding: 16px 14px 18px;
+    border-radius: 16px;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
+    min-width: 260px;
+}
+
+
+.timer-section h1 {
+    margin-bottom: 12px;
+    color: var(--text-color);
+    font-size: 1.25rem;
+}
+
+
+.timer-display {
+    margin: 14px 0;
+    padding: 16px;
+    border-radius: 12px;
+    background: var(--gradient-primary);
+    color: white;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 120px;
+}
+
+
+.timer-display .time {
+    font-size: 2.8rem;
+    font-weight: 700;
+    font-family: 'Poppins', monospace;
+    margin: 8px 0;
+    letter-spacing: 0.5px;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+
+.timer-display .status {
+    font-size: 0.92rem;
+    opacity: 0.9;
+    margin-top: 6px;
+    font-family: 'Poppins', sans-serif;
+}
+
+
+.timer-controls {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    margin: 10px 0 2px;
+    flex-wrap: wrap;
+}
+
+.settings-section {
+    background: white;
+    padding: 40px;
+    border-radius: 20px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+}
+
+.settings-section h2,
+.settings-section h3 {
+    font-size: 1rem;
+    color: var(--text-color);
+    margin: 12px 0 8px 0;
+    text-align: left;
+}
+
+.settings-section h2 {
+    font-size: 1.2rem;
+    margin-bottom: 14px;
+}
+
+.water-break-interval {
+    display: none;
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.break-settings {
+    margin-top: 30px;
+    padding: 20px;
+    background: var(--secondary-color);
+    border-radius: 10px;
+}
+
+.water-break-toggle {
+    margin-bottom: 20px;
+}
+
+.settings-group {
+    display: flex;
+    gap: 15px;
+    justify-content: space-between;
+    margin: 10px 0;
+    padding: 10px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+}
+
+.setting {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+}
+
+.setting label {
+    font-size: 0.85rem;
+    color: var(--text-color);
+}
+
+.setting input[type="number"] {
+    width: 70px;
+    padding: 6px;
+    border: 1.5px solid var(--primary-color);
+    border-radius: 5px;
+    font-size: 0.95rem;
+    text-align: center;
+}
+
+/* Toggle Switch */
+.toggle {
+    position: relative;
+    display: inline-block;
+    width: 60px;
+    height: 34px;
+}
+
+.toggle input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.toggle-label {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #ccc;
+    transition: .4s;
+    border-radius: 34px;
+}
+
+.toggle-label:before {
+    position: absolute;
+    content: "";
+    height: 26px;
+    width: 26px;
+    left: 4px;
+    bottom: 4px;
+    background-color: white;
+    transition: .4s;
+    border-radius: 50%;
+}
+
+input:checked + .toggle-label {
+    background-color: var(--primary-color);
+}
+
+input:checked + .toggle-label:before {
+    transform: translateX(26px);
+}
+
+/* Water Break Modal */
+.modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+}
+
+#timerEndModal .modal-content {
+    background: linear-gradient(135deg, #2c3e50 0%, #3498db 100%);
+    color: white;
+}
+
+#timerEndModal h2 {
+    color: white;
+    margin-bottom: 15px;
+}
+
+#timerEndModal p {
+    color: rgba(255, 255, 255, 0.9);
+    margin-bottom: 20px;
+}
+
+.modal.active {
+    display: flex;
+}
+
+.modal-content {
+    background: white;
+    padding: 30px;
+    border-radius: 15px;
+    text-align: center;
+    max-width: 400px;
+    width: 90%;
+}
+
+.modal-content h2 {
+    margin-bottom: 15px;
+    color: var(--text-color);
+}
+
+.modal-content p {
+    margin-bottom: 20px;
+    color: var(--text-light);
+}
+
+/* Button States */
+.btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
