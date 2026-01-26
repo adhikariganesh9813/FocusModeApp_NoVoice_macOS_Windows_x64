@@ -16,7 +16,10 @@ macOS (DMG):
 2) Double-click the DMG to open it.
 3) Drag "Focus Mode" into the Applications folder.
 4) Launch from Applications or Spotlight.
-5) If macOS blocks the app: go to System Settings > Privacy & Security > Open Anyway.
+5) If macOS blocks the app, allow it in Privacy & Security:
+   - Apple menu > System Settings > Privacy & Security.
+   - Under Security, click Open Anyway.
+   - Confirm Open, then enter your Mac password.
 
 Windows (EXE):
 1) Download `Focus.Mode.Setup.<version>-x64.exe`.

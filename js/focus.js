@@ -8,6 +8,7 @@ let waterBreakRemainingMs = null; // remaining time until next water break while
 let waterBreakActive = false; // true while water break modal is active
 let timerEndVoiceActive = false;
 let timerEndVoiceTimeoutId = null;
+let sessionRuntimeSeconds = 0;
 
 // Session stats tracking
 let sessionStats = {
@@ -121,16 +122,18 @@ function initializeFocusMode() {
         const offset = circumference - (progressClamped / 100) * circumference;
         progressRingCircle.style.strokeDashoffset = offset;
 
-        // Update current session time (excluding paused time)
-        let sessionElapsedSeconds;
-        if (sessionStats.pausedAt) {
-            // Currently paused - don't count time since pause
-            sessionElapsedSeconds = Math.floor((sessionStats.pausedAt - sessionStats.currentSessionStartTime - sessionStats.accumulatedPauseTime) / 1000);
-        } else {
-            // Currently active - count all time except accumulated pauses
-            sessionElapsedSeconds = Math.floor((Date.now() - sessionStats.currentSessionStartTime - sessionStats.accumulatedPauseTime) / 1000);
+        // Update session time while app is open (completed sessions + current active time)
+        let sessionElapsedSeconds = 0;
+        if (sessionStats.currentSessionStartTime) {
+            if (sessionStats.pausedAt) {
+                // Currently paused - don't count time since pause
+                sessionElapsedSeconds = Math.floor((sessionStats.pausedAt - sessionStats.currentSessionStartTime - sessionStats.accumulatedPauseTime) / 1000);
+            } else {
+                // Currently active - count all time except accumulated pauses
+                sessionElapsedSeconds = Math.floor((Date.now() - sessionStats.currentSessionStartTime - sessionStats.accumulatedPauseTime) / 1000);
+            }
         }
-        currentSessionTimeEl.textContent = formatTimeStats(sessionElapsedSeconds);
+        currentSessionTimeEl.textContent = formatTimeStats(sessionRuntimeSeconds + sessionElapsedSeconds);
         
         // Update total focus time in real-time
         if (!sessionStats.pausedAt && timerId) {
@@ -226,6 +229,7 @@ function initializeFocusMode() {
             sessionStats.totalFocusTimeSeconds += sessionDuration;
             sessionStats.sessionsCompleted++;
             sessionStats.currentStreak++;
+            sessionRuntimeSeconds += sessionDuration;
             sessionStats.currentSessionStartTime = null;
             sessionStats.currentSessionInitialTime = 0;
             sessionStats.pausedAt = null;
