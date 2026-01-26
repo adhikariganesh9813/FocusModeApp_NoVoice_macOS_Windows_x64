@@ -381,6 +381,12 @@
     color: #f39c12;
 }
 
+.stats-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 12px;
+}
+
 .settings-section {
     grid-area: settings;
     background: white;

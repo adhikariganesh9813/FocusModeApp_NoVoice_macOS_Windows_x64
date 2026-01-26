@@ -9,6 +9,7 @@ let waterBreakActive = false; // true while water break modal is active
 let timerEndVoiceActive = false;
 let timerEndVoiceTimeoutId = null;
 let sessionRuntimeSeconds = 0;
+let lastSessionSeconds = 0;
 
 // Session stats tracking
 let sessionStats = {
@@ -61,31 +62,22 @@ function initializeFocusMode() {
     const progressRingCircle = document.querySelector('.progress-ring-circle');
     const resetStatsButton = document.getElementById('resetStats');
 
-    // Load stats from local storage (schema-aware)
-    async function loadStats() {
-        if (window.FocusStorage && window.FocusStorage.loadAggregates) {
-            const aggregates = await window.FocusStorage.loadAggregates();
-            sessionStats = { ...sessionStats, ...aggregates };
-        }
-        clearStaleSessionTracking();
-        updateStatsDisplay();
-    }
-
-    // Save stats to local storage (schema-aware)
     function saveStats() {
-        if (window.FocusStorage && window.FocusStorage.saveAggregates) {
-            window.FocusStorage.saveAggregates(sessionStats);
-        }
+        return;
     }
 
     // Format seconds to readable time
     function formatTimeStats(seconds) {
         const hours = Math.floor(seconds / 3600);
         const minutes = Math.floor((seconds % 3600) / 60);
+        const remainingSeconds = Math.max(0, Math.floor(seconds % 60));
         if (hours > 0) {
             return `${hours}h ${minutes}m`;
         }
-        return `${minutes}m`;
+        if (minutes > 0) {
+            return `${minutes}m`;
+        }
+        return `${remainingSeconds}s`;
     }
 
     // Update stats display
@@ -94,6 +86,7 @@ function initializeFocusMode() {
         sessionsCompletedEl.textContent = sessionStats.sessionsCompleted;
         waterBreaksTakenEl.textContent = sessionStats.waterBreaksTaken;
         currentStreakEl.textContent = sessionStats.currentStreak;
+        currentSessionTimeEl.textContent = formatTimeStats(lastSessionSeconds);
         updateMotivationMessage();
     }
 
@@ -110,6 +103,7 @@ function initializeFocusMode() {
         if (!sessionStats.currentSessionStartTime || sessionStats.currentSessionInitialTime === 0) {
             progressPercentEl.textContent = '0%';
             progressRingCircle.style.strokeDashoffset = 326.73;
+            currentSessionTimeEl.textContent = formatTimeStats(lastSessionSeconds);
             return;
         }
 
@@ -123,18 +117,8 @@ function initializeFocusMode() {
         const offset = circumference - (progressClamped / 100) * circumference;
         progressRingCircle.style.strokeDashoffset = offset;
 
-        // Update session time while app is open (completed sessions + current active time)
-        let sessionElapsedSeconds = 0;
-        if (sessionStats.currentSessionStartTime) {
-            if (sessionStats.pausedAt) {
-                // Currently paused - don't count time since pause
-                sessionElapsedSeconds = Math.floor((sessionStats.pausedAt - sessionStats.currentSessionStartTime - sessionStats.accumulatedPauseTime) / 1000);
-            } else {
-                // Currently active - count all time except accumulated pauses
-                sessionElapsedSeconds = Math.floor((Date.now() - sessionStats.currentSessionStartTime - sessionStats.accumulatedPauseTime) / 1000);
-            }
-        }
-        currentSessionTimeEl.textContent = formatTimeStats(sessionRuntimeSeconds + sessionElapsedSeconds);
+        // Show the duration of the last completed session
+        currentSessionTimeEl.textContent = formatTimeStats(lastSessionSeconds);
         
         // Update total focus time in real-time
         if (!sessionStats.pausedAt && timerId) {
@@ -199,17 +183,7 @@ function initializeFocusMode() {
     }
 
     function initStatsDashboard() {
-        if (!window.FocusStorage) return;
-        window.FocusStorage.migrateIfNeeded();
-    }
-
-    function clearStaleSessionTracking() {
-        if (!sessionStats.currentSessionStartTime) return;
-        sessionStats.currentSessionStartTime = null;
-        sessionStats.currentSessionInitialTime = 0;
-        sessionStats.pausedAt = null;
-        sessionStats.accumulatedPauseTime = 0;
-        saveStats();
+        return;
     }
 
     // Complete a session
@@ -217,21 +191,9 @@ function initializeFocusMode() {
         if (sessionStats.currentSessionStartTime) {
             const totalElapsed = Date.now() - sessionStats.currentSessionStartTime;
             const activeTime = totalElapsed - (sessionStats.accumulatedPauseTime || 0);
-            const sessionDuration = Math.floor(activeTime / 1000);
+            const sessionDuration = Math.max(0, Math.round(activeTime / 1000));
             const sessionStartIso = new Date(sessionStats.currentSessionStartTime).toISOString();
             const sessionEndIso = new Date().toISOString();
-            const sessionRecord = {
-                id: (window.crypto && window.crypto.randomUUID) ? window.crypto.randomUUID() : `session-${Date.now()}-${Math.random().toString(16).slice(2)}`,
-                startTime: sessionStartIso,
-                endTime: sessionEndIso,
-                durationSeconds: sessionDuration,
-                type: 'focus',
-                completed: true,
-                createdAt: sessionEndIso
-            };
-            if (window.FocusStorage && window.FocusStorage.recordCompletedSession) {
-                window.FocusStorage.recordCompletedSession(sessionRecord);
-            }
             const keys = getDateKeys(Date.now());
             sessionStats.activityByDay[keys.day] = (sessionStats.activityByDay[keys.day] || 0) + sessionDuration;
             sessionStats.activityByMonth[keys.month] = (sessionStats.activityByMonth[keys.month] || 0) + sessionDuration;
@@ -240,6 +202,7 @@ function initializeFocusMode() {
             sessionStats.sessionsCompleted++;
             sessionStats.currentStreak++;
             sessionRuntimeSeconds += sessionDuration;
+            lastSessionSeconds = sessionDuration;
             sessionStats.currentSessionStartTime = null;
             sessionStats.currentSessionInitialTime = 0;
             sessionStats.pausedAt = null;
@@ -254,6 +217,7 @@ function initializeFocusMode() {
     async function resetAllStats() {
         if (confirm('Are you sure you want to reset all stats? This will clear your current session data.')) {
             sessionRuntimeSeconds = 0;
+            lastSessionSeconds = 0;
             sessionStats = {
                 totalFocusTimeSeconds: 0,
                 sessionsCompleted: 0,
@@ -268,9 +232,6 @@ function initializeFocusMode() {
                 activityByMonth: {},
                 activityByYear: {}
             };
-            if (window.FocusStorage && window.FocusStorage.resetAllStats) {
-                await window.FocusStorage.resetAllStats();
-            }
             saveStats();
             updateStatsDisplay();
             updateProgressRing();
@@ -561,13 +522,19 @@ function initializeFocusMode() {
     focusMinutesInput.addEventListener('input', onTimeInputChange);
 
     function startTimerEndAlarm() {
+        if (timerEndSound) {
+            timerEndSound.currentTime = 0;
+            timerEndSound.loop = true;
+            timerEndSound.play().catch(() => {});
+        }
         if (!('speechSynthesis' in window)) return;
         timerEndVoiceActive = true;
         if (timerEndVoiceTimeoutId) {
             clearTimeout(timerEndVoiceTimeoutId);
             timerEndVoiceTimeoutId = null;
         }
-        window.speechSynthesis.cancel();
+        const speech = window.speechSynthesis;
+        speech.cancel();
         const speakLoop = () => {
             if (!timerEndVoiceActive) return;
             const utterance = new SpeechSynthesisUtterance('Session End');
@@ -578,9 +545,18 @@ function initializeFocusMode() {
                     timerEndVoiceTimeoutId = setTimeout(speakLoop, 1200);
                 }
             };
-            window.speechSynthesis.speak(utterance);
+            speech.speak(utterance);
         };
         speakLoop();
+        setTimeout(() => {
+            if (!timerEndVoiceActive) return;
+            if (!speech.speaking) {
+                const fallback = new SpeechSynthesisUtterance('Session End');
+                fallback.rate = 1.0;
+                fallback.pitch = 1.0;
+                speech.speak(fallback);
+            }
+        }, 300);
     }
 
     function stopTimerEndAlarm() {
@@ -831,14 +807,13 @@ function initializeFocusMode() {
     updateDisplay();
     
     // Load and display stats
-    loadStats().then(() => {
-        updateProgressRing();
-        sessionStatusEl.textContent = 'Not Started';
-        initStatsDashboard();
-    });
+    updateStatsDisplay();
+    updateProgressRing();
+    sessionStatusEl.textContent = 'Not Started';
+    initStatsDashboard();
 
     window.addEventListener('beforeunload', () => {
-        saveStats();
+        return;
     });
 
     console.log('Focus mode initialized with time:', timeLeft); // Debug log

@@ -95,7 +95,7 @@
                     </div>
                     <div class="session-info">
                         <div class="info-item">
-                            <span class="info-label">Session Time:</span>
+                            <span class="info-label">Last Session:</span>
                             <span class="info-value" id="currentSessionTime">0m</span>
                         </div>
                         <div class="info-item">
@@ -110,6 +110,11 @@
                         <i class="fas fa-lightbulb"></i>
                         <span>Start your focus session to build momentum!</span>
                     </div>
+                </div>
+                <div class="stats-actions">
+                    <button id="resetStats" class="btn btn-secondary">
+                        <i class="fas fa-rotate-left"></i> Reset Progress
+                    </button>
                 </div>
             </section>
 
@@ -177,7 +182,6 @@
         <source src="assets/audio/water-break.mp3" type="audio/mp3">
     </audio>
 
-    <script src="services/storage.js"></script>
     <script src="services/analytics.js"></script>
     <script src="js/focus.js"></script>
 </body>
