@@ -21,7 +21,6 @@ let sessionStats = {
     lastSessionDate: null,
     pausedAt: null,
     accumulatedPauseTime: 0,
-    lastActiveAt: null,
     activityByDay: {},
     activityByMonth: {},
     activityByYear: {}
@@ -68,7 +67,7 @@ function initializeFocusMode() {
             const aggregates = await window.FocusStorage.loadAggregates();
             sessionStats = { ...sessionStats, ...aggregates };
         }
-        reconcileSessionTiming();
+        clearStaleSessionTracking();
         updateStatsDisplay();
     }
 
@@ -204,21 +203,12 @@ function initializeFocusMode() {
         window.FocusStorage.migrateIfNeeded();
     }
 
-    function reconcileSessionTiming() {
+    function clearStaleSessionTracking() {
         if (!sessionStats.currentSessionStartTime) return;
-        const now = Date.now();
-        if (!sessionStats.pausedAt) {
-            const lastActiveAt = sessionStats.lastActiveAt;
-            if (lastActiveAt && lastActiveAt > sessionStats.currentSessionStartTime) {
-                const offlineMs = Math.max(0, now - lastActiveAt);
-                sessionStats.accumulatedPauseTime = (sessionStats.accumulatedPauseTime || 0) + offlineMs;
-            } else if (!lastActiveAt) {
-                const sinceStartMs = Math.max(0, now - sessionStats.currentSessionStartTime);
-                sessionStats.accumulatedPauseTime = (sessionStats.accumulatedPauseTime || 0) + sinceStartMs;
-            }
-            sessionStats.pausedAt = now;
-        }
-        sessionStats.lastActiveAt = now;
+        sessionStats.currentSessionStartTime = null;
+        sessionStats.currentSessionInitialTime = 0;
+        sessionStats.pausedAt = null;
+        sessionStats.accumulatedPauseTime = 0;
         saveStats();
     }
 
@@ -274,7 +264,6 @@ function initializeFocusMode() {
                 lastSessionDate: null,
                 pausedAt: null,
                 accumulatedPauseTime: 0,
-                lastActiveAt: null,
                 activityByDay: {},
                 activityByMonth: {},
                 activityByYear: {}
@@ -826,6 +815,8 @@ function initializeFocusMode() {
     closeTimerButton.addEventListener('click', () => {
         stopTimerEndAlarm();
         timerEndModal.style.display = 'none';
+        updateStatsDisplay();
+        updateProgressRing();
     });
 
     // Reset stats button
@@ -847,7 +838,6 @@ function initializeFocusMode() {
     });
 
     window.addEventListener('beforeunload', () => {
-        sessionStats.lastActiveAt = Date.now();
         saveStats();
     });
 
