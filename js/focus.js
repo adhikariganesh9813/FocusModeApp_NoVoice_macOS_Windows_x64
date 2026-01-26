@@ -62,8 +62,18 @@ function initializeFocusMode() {
     const progressRingCircle = document.querySelector('.progress-ring-circle');
     const resetStatsButton = document.getElementById('resetStats');
 
+    async function loadStats() {
+        if (window.FocusStorage && window.FocusStorage.loadAggregates) {
+            const aggregates = await window.FocusStorage.loadAggregates();
+            sessionStats = { ...sessionStats, ...aggregates };
+        }
+        updateStatsDisplay();
+    }
+
     function saveStats() {
-        return;
+        if (window.FocusStorage && window.FocusStorage.saveAggregates) {
+            window.FocusStorage.saveAggregates(sessionStats);
+        }
     }
 
     // Format seconds to readable time
@@ -183,17 +193,27 @@ function initializeFocusMode() {
     }
 
     function initStatsDashboard() {
-        return;
+        if (!window.FocusStorage) return;
+        window.FocusStorage.migrateIfNeeded();
     }
 
     // Complete a session
-    function completeSession() {
+    async function completeSession() {
         if (sessionStats.currentSessionStartTime) {
             const totalElapsed = Date.now() - sessionStats.currentSessionStartTime;
             const activeTime = totalElapsed - (sessionStats.accumulatedPauseTime || 0);
             const sessionDuration = Math.max(0, Math.round(activeTime / 1000));
             const sessionStartIso = new Date(sessionStats.currentSessionStartTime).toISOString();
             const sessionEndIso = new Date().toISOString();
+            const sessionRecord = {
+                id: (window.crypto && window.crypto.randomUUID) ? window.crypto.randomUUID() : `session-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+                startTime: sessionStartIso,
+                endTime: sessionEndIso,
+                durationSeconds: sessionDuration,
+                type: 'focus',
+                completed: true,
+                createdAt: sessionEndIso
+            };
             const keys = getDateKeys(Date.now());
             sessionStats.activityByDay[keys.day] = (sessionStats.activityByDay[keys.day] || 0) + sessionDuration;
             sessionStats.activityByMonth[keys.month] = (sessionStats.activityByMonth[keys.month] || 0) + sessionDuration;
@@ -207,6 +227,10 @@ function initializeFocusMode() {
             sessionStats.currentSessionInitialTime = 0;
             sessionStats.pausedAt = null;
             sessionStats.accumulatedPauseTime = 0;
+            saveStats();
+            if (window.FocusStorage && window.FocusStorage.recordCompletedSession) {
+                await window.FocusStorage.recordCompletedSession(sessionRecord);
+            }
             saveStats();
             updateStatsDisplay();
             updateProgressRing();
@@ -232,6 +256,9 @@ function initializeFocusMode() {
                 activityByMonth: {},
                 activityByYear: {}
             };
+            if (window.FocusStorage && window.FocusStorage.resetAllStats) {
+                await window.FocusStorage.resetAllStats();
+            }
             saveStats();
             updateStatsDisplay();
             updateProgressRing();
@@ -807,13 +834,14 @@ function initializeFocusMode() {
     updateDisplay();
     
     // Load and display stats
-    updateStatsDisplay();
-    updateProgressRing();
-    sessionStatusEl.textContent = 'Not Started';
-    initStatsDashboard();
+    loadStats().then(() => {
+        updateProgressRing();
+        sessionStatusEl.textContent = 'Not Started';
+        initStatsDashboard();
+    });
 
     window.addEventListener('beforeunload', () => {
-        return;
+        saveStats();
     });
 
     console.log('Focus mode initialized with time:', timeLeft); // Debug log
