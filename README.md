@@ -8,6 +8,10 @@ Features:
 - Session stats and progress ring
 - Spoken status cues and end-of-session voice alert
 
+## Motivation
+
+I built this app to remind myself to drink water because I forget to stay hydrated when I am deeply focused on work or study. It helps me keep my energy and focus consistent while I am on my PC and tracks the time I spend on work and study. It also gives me practice in coding and product development.
+
 ## Install
 Installers are located in the `dist` folder after you build the app (or under GitHub Releases if you download them there).
 
