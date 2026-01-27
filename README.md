@@ -7,6 +7,8 @@ Features:
 - Optional water break reminders
 - Session stats and progress ring
 - Spoken status cues and end-of-session voice alert
+- Focus totals bar chart with weekly (Mon–Sun), monthly, and yearly views
+- Weekly average and week navigation for daily stats
 
 ## Motivation
 
