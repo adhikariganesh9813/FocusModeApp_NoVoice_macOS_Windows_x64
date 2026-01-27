@@ -381,6 +381,139 @@
     color: #f39c12;
 }
 
+.insights-section {
+    margin-top: 10px;
+    padding: 10px;
+    background: linear-gradient(135deg, #f5f7fa 0%, #e4e9f2 100%);
+    border-radius: 9px;
+}
+
+.insights-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 8px;
+    flex-wrap: wrap;
+}
+
+.insights-header h3 {
+    margin: 0;
+}
+
+.insights-toggle {
+    display: inline-flex;
+    gap: 6px;
+    background: white;
+    padding: 4px;
+    border-radius: 999px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+
+.toggle-btn {
+    border: none;
+    background: transparent;
+    color: var(--text-color);
+    font-size: 0.75rem;
+    padding: 6px 10px;
+    border-radius: 999px;
+    cursor: pointer;
+    font-weight: 600;
+}
+
+.toggle-btn.active {
+    background: var(--gradient-primary);
+    color: white;
+}
+
+.insights-chart {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 6px;
+    align-items: end;
+    min-height: 140px;
+    padding: 6px 4px 2px;
+    background: white;
+    border-radius: 8px;
+}
+
+.insights-subheader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin: 4px 0 8px;
+    flex-wrap: wrap;
+}
+
+.insights-range {
+    font-size: 0.78rem;
+    color: var(--text-color);
+    font-weight: 600;
+}
+
+.insights-average {
+    font-size: 0.78rem;
+    color: var(--text-color);
+    font-weight: 700;
+    padding: 4px 10px;
+    background: white;
+    border-radius: 999px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+
+.insights-nav {
+    display: inline-flex;
+    gap: 6px;
+}
+
+.nav-btn {
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    background: white;
+    color: var(--text-color);
+    font-size: 0.72rem;
+    padding: 5px 8px;
+    border-radius: 999px;
+    cursor: pointer;
+    font-weight: 600;
+}
+
+.nav-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.insight-bar {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    height: 100%;
+    justify-content: flex-end;
+}
+
+.insight-bar-fill {
+    width: 100%;
+    max-width: 22px;
+    min-height: 6px;
+    border-radius: 6px;
+    background: var(--gradient-primary);
+    box-shadow: 0 4px 8px rgba(24, 40, 72, 0.2);
+    transition: height 0.3s ease;
+}
+
+.insight-bar-value {
+    font-size: 0.68rem;
+    font-weight: 700;
+    color: var(--text-color);
+    line-height: 1;
+}
+
+.insight-bar-label {
+    font-size: 0.65rem;
+    color: #7f8c8d;
+}
+
 .stats-actions {
     display: flex;
     justify-content: flex-end;

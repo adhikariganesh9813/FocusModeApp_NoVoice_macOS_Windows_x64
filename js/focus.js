@@ -61,6 +61,17 @@ function initializeFocusMode() {
     const motivationMessageEl = document.getElementById('motivationMessage');
     const progressRingCircle = document.querySelector('.progress-ring-circle');
     const resetStatsButton = document.getElementById('resetStats');
+    const focusTotalsChart = document.getElementById('focusTotalsChart');
+    const focusInsights = document.getElementById('focusInsights');
+    const insightsToggleButtons = focusInsights ? focusInsights.querySelectorAll('.toggle-btn') : [];
+    const focusTotalsRange = document.getElementById('focusTotalsRange');
+    const dailyRangeControls = document.getElementById('dailyRangeControls');
+    const dailyRangeButtons = dailyRangeControls ? dailyRangeControls.querySelectorAll('.nav-btn') : [];
+    const weeklyAverageEl = document.getElementById('weeklyAverage');
+
+    let currentChartView = 'daily';
+    let sessionHistory = [];
+    let dailyWeekOffset = 0;
 
     async function loadStats() {
         if (window.FocusStorage && window.FocusStorage.loadAggregates) {
@@ -108,6 +119,231 @@ function initializeFocusMode() {
         }
     }
 
+    function formatDurationShort(seconds) {
+        const totalSeconds = Math.max(0, Math.round(seconds || 0));
+        const minutes = Math.round(totalSeconds / 60);
+        if (minutes <= 0) return '0m';
+        if (minutes < 60) return `${minutes}m`;
+        const hours = totalSeconds / 3600;
+        const display = hours >= 10 ? Math.round(hours) : Math.round(hours * 10) / 10;
+        return `${display}h`;
+    }
+
+    function formatDurationCompact(seconds) {
+        const totalSeconds = Math.max(0, Math.round(seconds || 0));
+        const hours = Math.floor(totalSeconds / 3600);
+        const minutes = Math.floor((totalSeconds % 3600) / 60);
+        if (hours > 0) return `${hours}h ${minutes}m`;
+        return `${minutes}m`;
+    }
+
+    function getMondayStart(date) {
+        const day = date.getDay();
+        const diffToMonday = (day + 6) % 7;
+        return new Date(date.getFullYear(), date.getMonth(), date.getDate() - diffToMonday);
+    }
+
+    function buildDailyChartData(sessions) {
+        const MS_PER_DAY = 24 * 60 * 60 * 1000;
+        const now = new Date();
+        const weekStart = getMondayStart(new Date(now.getTime() + (dailyWeekOffset * 7 * MS_PER_DAY)));
+        const startMs = weekStart.getTime();
+        const endMs = startMs + (6 * MS_PER_DAY);
+        const fallbackMap = sessionStats.activityByDay || {};
+        if (window.FocusAnalytics && window.FocusAnalytics.getDailyTotals) {
+            const dailyTotals = window.FocusAnalytics.getDailyTotals(sessions, startMs, endMs);
+            return dailyTotals.map((day) => ({
+                label: day.date.toLocaleDateString(undefined, { weekday: 'short' }),
+                seconds: day.totalSeconds || 0,
+                dayKey: day.dayKey,
+                date: day.date
+            }));
+        }
+        const labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+        return labels.map((label, index) => {
+            const day = new Date(startMs + (index * MS_PER_DAY));
+            const key = window.FocusAnalytics ? window.FocusAnalytics.toDayKey(day) : '';
+            return { label, seconds: fallbackMap[key] || 0, dayKey: key, date: day };
+        });
+    }
+
+    function buildMonthlyChartData(sessions) {
+        const year = new Date().getFullYear();
+        const labels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        const fallbackMap = sessionStats.activityByMonth || {};
+        if (window.FocusAnalytics && window.FocusAnalytics.getMonthlyTotals) {
+            const totals = window.FocusAnalytics.getMonthlyTotals(sessions, year);
+            return labels.map((label, index) => ({
+                label,
+                seconds: totals[index] || 0,
+                monthKey: `${year}-${String(index + 1).padStart(2, '0')}`
+            }));
+        }
+        return labels.map((label, index) => {
+            const key = `${year}-${String(index + 1).padStart(2, '0')}`;
+            return { label, seconds: fallbackMap[key] || 0, monthKey: key };
+        });
+    }
+
+    function buildYearlyChartData(sessions) {
+        const currentYear = new Date().getFullYear();
+        const startYear = currentYear;
+        const endYear = currentYear + 9;
+        const totals = new Map();
+        for (let year = startYear; year <= endYear; year++) {
+            totals.set(year, 0);
+        }
+
+        if (window.FocusAnalytics && window.FocusAnalytics.splitSessionByDay) {
+            sessions.forEach((session) => {
+                const chunks = window.FocusAnalytics.splitSessionByDay(session);
+                chunks.forEach((chunk) => {
+                    const year = Number(chunk.dayKey.slice(0, 4));
+                    if (totals.has(year)) {
+                        totals.set(year, totals.get(year) + chunk.seconds);
+                    }
+                });
+            });
+        } else {
+            sessions.forEach((session) => {
+                const year = new Date(session.startTime).getFullYear();
+                if (totals.has(year)) {
+                    totals.set(year, totals.get(year) + (session.durationSeconds || 0));
+                }
+            });
+        }
+
+        const fallbackMap = sessionStats.activityByYear || {};
+        const data = [];
+        for (let year = startYear; year <= endYear; year++) {
+            data.push({ label: String(year), seconds: totals.get(year) || 0, yearKey: String(year) });
+        }
+        return data;
+    }
+
+    function renderFocusTotalsChart() {
+        if (!focusTotalsChart) return;
+        const sessionsForChart = sessionHistory.slice();
+        let data = [];
+        if (currentChartView === 'monthly') {
+            data = buildMonthlyChartData(sessionsForChart);
+        } else if (currentChartView === 'yearly') {
+            data = buildYearlyChartData(sessionsForChart);
+        } else {
+            data = buildDailyChartData(sessionsForChart);
+        }
+
+        if (currentChartView === 'monthly') {
+            data = data.map((item) => {
+                const aggregate = sessionStats.activityByMonth?.[item.monthKey] || 0;
+                return { ...item, seconds: Math.max(item.seconds || 0, aggregate) };
+            });
+        } else if (currentChartView === 'yearly') {
+            data = data.map((item) => {
+                const aggregate = sessionStats.activityByYear?.[item.yearKey] || 0;
+                return { ...item, seconds: Math.max(item.seconds || 0, aggregate) };
+            });
+        } else {
+            data = data.map((item) => {
+                const aggregate = sessionStats.activityByDay?.[item.dayKey] || 0;
+                return { ...item, seconds: Math.max(item.seconds || 0, aggregate) };
+            });
+        }
+
+        const maxSeconds = data.reduce((max, item) => Math.max(max, item.seconds), 0);
+        focusTotalsChart.style.gridTemplateColumns = `repeat(${data.length}, 1fr)`;
+        focusTotalsChart.innerHTML = '';
+
+        if (!data.length) {
+            const empty = document.createElement('div');
+            empty.textContent = 'No focus sessions yet.';
+            empty.style.gridColumn = '1 / -1';
+            empty.style.textAlign = 'center';
+            empty.style.color = '#7f8c8d';
+            focusTotalsChart.appendChild(empty);
+            return;
+        }
+
+        data.forEach((item) => {
+            const bar = document.createElement('div');
+            bar.className = 'insight-bar';
+
+            const value = document.createElement('div');
+            value.className = 'insight-bar-value';
+            value.textContent = formatDurationShort(item.seconds);
+
+            const fill = document.createElement('div');
+            fill.className = 'insight-bar-fill';
+            const heightPercent = maxSeconds > 0 ? Math.round((item.seconds / maxSeconds) * 100) : 0;
+            fill.style.height = `${heightPercent}%`;
+
+            const label = document.createElement('div');
+            label.className = 'insight-bar-label';
+            if (currentChartView === 'daily' && item.date instanceof Date) {
+                label.textContent = item.date.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+            } else {
+                label.textContent = item.label;
+            }
+
+            bar.appendChild(value);
+            bar.appendChild(fill);
+            bar.appendChild(label);
+            focusTotalsChart.appendChild(bar);
+        });
+
+        updateRangeHeader(data);
+        updateWeeklyAverage(data);
+    }
+
+    function updateWeeklyAverage(data) {
+        if (!weeklyAverageEl) return;
+        if (currentChartView !== 'daily') {
+            weeklyAverageEl.style.display = 'none';
+            return;
+        }
+        weeklyAverageEl.style.display = 'inline-flex';
+        const totalSeconds = data.reduce((sum, item) => sum + (item.seconds || 0), 0);
+        const avgSeconds = data.length ? Math.round(totalSeconds / data.length) : 0;
+        weeklyAverageEl.textContent = `Weekly Avg: ${formatDurationCompact(avgSeconds)}`;
+    }
+
+    function updateRangeHeader(data) {
+        if (!focusTotalsRange) return;
+        if (currentChartView === 'daily' && data.length && data[0].date instanceof Date) {
+            const start = data[0].date;
+            const end = data[data.length - 1].date;
+            const startText = start.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+            const endText = end.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+            const yearText = end.toLocaleDateString(undefined, { year: 'numeric' });
+            focusTotalsRange.textContent = `${startText} - ${endText}, ${yearText}`;
+        } else if (currentChartView === 'monthly') {
+            focusTotalsRange.textContent = new Date().toLocaleDateString(undefined, { year: 'numeric' });
+        } else if (currentChartView === 'yearly') {
+            const year = new Date().getFullYear();
+            focusTotalsRange.textContent = `${year} - ${year + 9}`;
+        } else {
+            focusTotalsRange.textContent = 'Week';
+        }
+
+        if (dailyRangeControls) {
+            dailyRangeControls.style.display = currentChartView === 'daily' ? 'inline-flex' : 'none';
+        }
+    }
+
+    async function loadSessionHistory() {
+        if (window.FocusStorage && window.FocusStorage.loadSessions) {
+            sessionHistory = await window.FocusStorage.loadSessions();
+        }
+    }
+
+    async function refreshStatsDashboard(options = {}) {
+        if (!focusTotalsChart) return;
+        if (!sessionHistory.length || options.forceReload) {
+            await loadSessionHistory();
+        }
+        renderFocusTotalsChart();
+    }
+
     // Update progress ring
     function updateProgressRing() {
         if (!sessionStats.currentSessionStartTime || sessionStats.currentSessionInitialTime === 0) {
@@ -130,11 +366,7 @@ function initializeFocusMode() {
         // Show the duration of the last completed session
         currentSessionTimeEl.textContent = formatTimeStats(lastSessionSeconds);
         
-        // Update total focus time in real-time
-        if (!sessionStats.pausedAt && timerId) {
-            sessionStats.totalFocusTimeSeconds = (sessionStats.totalFocusTimeSeconds || 0);
-            totalFocusTimeEl.textContent = formatTimeStats(sessionStats.totalFocusTimeSeconds + sessionElapsedSeconds);
-        }
+        // Keep total focus time static; it updates only when a session completes.
     }
 
     // Update motivation message based on stats
@@ -231,9 +463,13 @@ function initializeFocusMode() {
             if (window.FocusStorage && window.FocusStorage.recordCompletedSession) {
                 await window.FocusStorage.recordCompletedSession(sessionRecord);
             }
+            if (Array.isArray(sessionHistory)) {
+                sessionHistory.push(sessionRecord);
+            }
             saveStats();
             updateStatsDisplay();
             updateProgressRing();
+            refreshStatsDashboard();
         }
     }
 
@@ -264,7 +500,7 @@ function initializeFocusMode() {
             updateProgressRing();
             sessionStatusEl.textContent = 'Not Started';
             if (typeof refreshStatsDashboard === 'function') {
-                refreshStatsDashboard();
+                refreshStatsDashboard({ forceReload: true });
             }
         }
     }
@@ -838,7 +1074,38 @@ function initializeFocusMode() {
         updateProgressRing();
         sessionStatusEl.textContent = 'Not Started';
         initStatsDashboard();
+        refreshStatsDashboard();
     });
+
+    if (insightsToggleButtons && insightsToggleButtons.length) {
+        insightsToggleButtons.forEach((button) => {
+            button.addEventListener('click', () => {
+                insightsToggleButtons.forEach((btn) => btn.classList.remove('active'));
+                button.classList.add('active');
+                currentChartView = button.dataset.view || 'daily';
+                if (currentChartView === 'daily') {
+                    dailyWeekOffset = 0;
+                }
+                renderFocusTotalsChart();
+            });
+        });
+    }
+
+    if (dailyRangeButtons && dailyRangeButtons.length) {
+        dailyRangeButtons.forEach((button) => {
+            button.addEventListener('click', () => {
+                const shift = Number(button.dataset.shift || 0);
+                if (shift === 0) {
+                    dailyWeekOffset = 0;
+                } else {
+                    dailyWeekOffset += shift;
+                }
+                renderFocusTotalsChart();
+            });
+        });
+    }
+
+    window.refreshStatsDashboard = refreshStatsDashboard;
 
     window.addEventListener('beforeunload', () => {
         saveStats();
