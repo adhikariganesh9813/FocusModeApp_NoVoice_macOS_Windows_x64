@@ -10,6 +10,7 @@ let timerEndVoiceActive = false;
 let timerEndVoiceTimeoutId = null;
 let sessionRuntimeSeconds = 0;
 let lastSessionSeconds = 0;
+let suppressAutoStartUntil = 0;
 
 // Session stats tracking
 let sessionStats = {
@@ -20,6 +21,7 @@ let sessionStats = {
     currentSessionStartTime: null,
     currentSessionInitialTime: 0,
     lastSessionDate: null,
+    lastStatsDate: null,
     pausedAt: null,
     accumulatedPauseTime: 0,
     activityByDay: {},
@@ -78,6 +80,7 @@ function initializeFocusMode() {
             const aggregates = await window.FocusStorage.loadAggregates();
             sessionStats = { ...sessionStats, ...aggregates };
         }
+        ensureDailyStats();
         updateStatsDisplay();
     }
 
@@ -334,6 +337,10 @@ function initializeFocusMode() {
         if (window.FocusStorage && window.FocusStorage.loadSessions) {
             sessionHistory = await window.FocusStorage.loadSessions();
         }
+        rebuildAggregatesFromHistory();
+        syncTodayStatsFromHistory();
+        saveStats();
+        updateStatsDisplay();
     }
 
     async function refreshStatsDashboard(options = {}) {
@@ -424,6 +431,119 @@ function initializeFocusMode() {
         };
     }
 
+    function getLocalDayKey(date = new Date()) {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    }
+
+    function resetDailyStats(options = {}) {
+        const { preserveSession = false } = options;
+        sessionStats.totalFocusTimeSeconds = 0;
+        sessionStats.sessionsCompleted = 0;
+        sessionStats.waterBreaksTaken = 0;
+        sessionStats.currentStreak = 0;
+        if (!preserveSession) {
+            sessionStats.currentSessionStartTime = null;
+            sessionStats.currentSessionInitialTime = 0;
+            sessionStats.pausedAt = null;
+            sessionStats.accumulatedPauseTime = 0;
+        }
+        lastSessionSeconds = 0;
+    }
+
+    function ensureDailyStats(options = {}) {
+        const { persist = true, preserveSession = false } = options;
+        const todayKey = getLocalDayKey();
+        const lastStatsDate = sessionStats.lastStatsDate || sessionStats.lastSessionDate;
+        if (lastStatsDate !== todayKey) {
+            resetDailyStats({ preserveSession });
+            sessionStats.lastStatsDate = todayKey;
+            sessionStats.lastSessionDate = todayKey;
+            if (persist) {
+                saveStats();
+            }
+            return true;
+        }
+        if (!sessionStats.lastStatsDate) {
+            sessionStats.lastStatsDate = todayKey;
+            sessionStats.lastSessionDate = todayKey;
+            if (persist) {
+                saveStats();
+            }
+        }
+        return false;
+    }
+
+    function syncTodayStatsFromHistory() {
+        if (!window.FocusAnalytics || !window.FocusAnalytics.getDailyTotals) return;
+        if (!Array.isArray(sessionHistory)) return;
+        const now = new Date();
+        const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const end = new Date(start.getTime() + (24 * 60 * 60 * 1000) - 1);
+        const dailyTotals = window.FocusAnalytics.getDailyTotals(sessionHistory, start.getTime(), end.getTime());
+        const todayKey = getLocalDayKey(now);
+        const today = dailyTotals.find((day) => day.dayKey === todayKey);
+        if (!today) return;
+        sessionStats.totalFocusTimeSeconds = today.totalSeconds || 0;
+        sessionStats.sessionsCompleted = today.sessionsCount || 0;
+    }
+
+    function rebuildAggregatesFromHistory() {
+        if (!window.FocusAnalytics || !window.FocusAnalytics.splitSessionByDay) return;
+        if (!Array.isArray(sessionHistory)) return;
+        if (sessionHistory.length === 0) return;
+        const existingDayTotals = sessionStats.activityByDay || {};
+        const existingMonthTotals = sessionStats.activityByMonth || {};
+        const existingYearTotals = sessionStats.activityByYear || {};
+        const dayTotals = {};
+        const monthTotals = {};
+        const yearTotals = {};
+        const sessionCountsByDay = {};
+        sessionHistory.forEach((session) => {
+            window.FocusAnalytics.splitSessionByDay(session).forEach((chunk) => {
+                dayTotals[chunk.dayKey] = (dayTotals[chunk.dayKey] || 0) + chunk.seconds;
+                const monthKey = chunk.dayKey.slice(0, 7);
+                const yearKey = chunk.dayKey.slice(0, 4);
+                monthTotals[monthKey] = (monthTotals[monthKey] || 0) + chunk.seconds;
+                yearTotals[yearKey] = (yearTotals[yearKey] || 0) + chunk.seconds;
+            });
+            const startKey = window.FocusAnalytics.toDayKey
+                ? window.FocusAnalytics.toDayKey(new Date(session.startTime))
+                : getLocalDayKey(new Date(session.startTime));
+            sessionCountsByDay[startKey] = (sessionCountsByDay[startKey] || 0) + 1;
+        });
+        const mergedDayTotals = { ...existingDayTotals };
+        Object.entries(dayTotals).forEach(([key, value]) => {
+            mergedDayTotals[key] = Math.max(existingDayTotals[key] || 0, value || 0);
+        });
+        const mergedMonthTotals = { ...existingMonthTotals };
+        Object.entries(monthTotals).forEach(([key, value]) => {
+            mergedMonthTotals[key] = Math.max(existingMonthTotals[key] || 0, value || 0);
+        });
+        const mergedYearTotals = { ...existingYearTotals };
+        Object.entries(yearTotals).forEach(([key, value]) => {
+            mergedYearTotals[key] = Math.max(existingYearTotals[key] || 0, value || 0);
+        });
+        sessionStats.activityByDay = mergedDayTotals;
+        sessionStats.activityByMonth = mergedMonthTotals;
+        sessionStats.activityByYear = mergedYearTotals;
+
+        const todayKey = getLocalDayKey();
+        if (dayTotals[todayKey] !== undefined) {
+            sessionStats.totalFocusTimeSeconds = dayTotals[todayKey] || 0;
+        }
+        if (sessionCountsByDay[todayKey] !== undefined) {
+            sessionStats.sessionsCompleted = sessionCountsByDay[todayKey] || 0;
+        }
+
+        if (window.FocusAnalytics.getStreaks) {
+            const streaks = window.FocusAnalytics.getStreaks(sessionHistory);
+            sessionStats.currentStreak = streaks.current || 0;
+        }
+    }
+
     function initStatsDashboard() {
         if (!window.FocusStorage) return;
         window.FocusStorage.migrateIfNeeded();
@@ -431,6 +551,7 @@ function initializeFocusMode() {
 
     // Complete a session
     async function completeSession() {
+        ensureDailyStats({ persist: false, preserveSession: true });
         if (sessionStats.currentSessionStartTime) {
             const totalElapsed = Date.now() - sessionStats.currentSessionStartTime;
             const activeTime = totalElapsed - (sessionStats.accumulatedPauseTime || 0);
@@ -486,6 +607,7 @@ function initializeFocusMode() {
                 currentSessionStartTime: null,
                 currentSessionInitialTime: 0,
                 lastSessionDate: null,
+                lastStatsDate: getLocalDayKey(),
                 pausedAt: null,
                 accumulatedPauseTime: 0,
                 activityByDay: {},
@@ -599,6 +721,8 @@ function initializeFocusMode() {
     function startTimer() {
         if (waterBreakActive) return;
         if (timerId) return;  // Prevent multiple timers
+        if (suppressAutoStartUntil && Date.now() < suppressAutoStartUntil) return;
+        ensureDailyStats();
         const isNewSession = !sessionStats.currentSessionStartTime;
         stopTimerEndAlarm();
 
@@ -681,6 +805,7 @@ function initializeFocusMode() {
                 
                 startTimerEndAlarm();
                 timerEndModal.style.display = 'flex';
+                suppressAutoStartUntil = Date.now() + 400;
                 waterBreakRemainingMs = null;
                 waterBreakActive = false;
                 clearTimeout(waterTimeoutId); waterTimeoutId = null; nextBreakAtMs = null;
@@ -1054,6 +1179,7 @@ function initializeFocusMode() {
     closeTimerButton.addEventListener('click', () => {
         stopTimerEndAlarm();
         timerEndModal.style.display = 'none';
+        suppressAutoStartUntil = Date.now() + 400;
         updateStatsDisplay();
         updateProgressRing();
     });
@@ -1106,6 +1232,15 @@ function initializeFocusMode() {
     }
 
     window.refreshStatsDashboard = refreshStatsDashboard;
+
+    window.addEventListener('focus', () => {
+        if (ensureDailyStats()) {
+            syncTodayStatsFromHistory();
+            updateStatsDisplay();
+            updateProgressRing();
+            refreshStatsDashboard({ forceReload: true });
+        }
+    });
 
     window.addEventListener('beforeunload', () => {
         saveStats();

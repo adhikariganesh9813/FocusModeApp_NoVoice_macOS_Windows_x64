@@ -14,6 +14,7 @@
       currentSessionStartTime: null,
       currentSessionInitialTime: 0,
       lastSessionDate: null,
+      lastStatsDate: null,
       pausedAt: null,
       accumulatedPauseTime: 0,
       activityByDay: {},
