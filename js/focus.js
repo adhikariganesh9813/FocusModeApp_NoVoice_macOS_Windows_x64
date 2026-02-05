@@ -90,8 +90,9 @@ function initializeFocusMode() {
 
     function saveStats() {
         if (window.FocusStorage && window.FocusStorage.saveAggregates) {
-            window.FocusStorage.saveAggregates(sessionStats);
+            return window.FocusStorage.saveAggregates(sessionStats);
         }
+        return Promise.resolve(false);
     }
 
     // Format seconds to readable time
@@ -447,17 +448,12 @@ function initializeFocusMode() {
 
     function resetDailyStats(options = {}) {
         const { preserveSession = false } = options;
-        sessionStats.totalFocusTimeSeconds = 0;
-        sessionStats.sessionsCompleted = 0;
-        sessionStats.waterBreaksTaken = 0;
-        sessionStats.currentStreak = 0;
         if (!preserveSession) {
             sessionStats.currentSessionStartTime = null;
             sessionStats.currentSessionInitialTime = 0;
             sessionStats.pausedAt = null;
             sessionStats.accumulatedPauseTime = 0;
         }
-        lastSessionSeconds = 0;
     }
 
     function ensureDailyStats(options = {}) {
@@ -486,35 +482,19 @@ function initializeFocusMode() {
     }
 
     function syncTodayStatsFromHistory() {
-        if (!window.FocusAnalytics || !window.FocusAnalytics.getDailyTotals) return;
+        if (!window.FocusAnalytics || !window.FocusAnalytics.getStreaks) return;
         if (!Array.isArray(sessionHistory)) return;
-        const now = new Date();
-        const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-        const end = new Date(start.getTime() + (24 * 60 * 60 * 1000) - 1);
-        const dailyTotals = window.FocusAnalytics.getDailyTotals(sessionHistory, start.getTime(), end.getTime());
-        const todayKey = getLocalDayKey(now);
-        const today = dailyTotals.find((day) => day.dayKey === todayKey);
-        if (!today) return;
-        sessionStats.totalFocusTimeSeconds = today.totalSeconds || 0;
-        sessionStats.sessionsCompleted = today.sessionsCount || 0;
-        // Also update current streak from session history
-        if (window.FocusAnalytics.getStreaks) {
-            const streaks = window.FocusAnalytics.getStreaks(sessionHistory);
-            sessionStats.currentStreak = streaks.current || 0;
-        }
+        const streaks = window.FocusAnalytics.getStreaks(sessionHistory);
+        sessionStats.currentStreak = streaks.current || 0;
     }
 
     function rebuildAggregatesFromHistory() {
         if (!window.FocusAnalytics || !window.FocusAnalytics.splitSessionByDay) return;
         if (!Array.isArray(sessionHistory)) return;
         if (sessionHistory.length === 0) return;
-        const existingDayTotals = sessionStats.activityByDay || {};
-        const existingMonthTotals = sessionStats.activityByMonth || {};
-        const existingYearTotals = sessionStats.activityByYear || {};
         const dayTotals = {};
         const monthTotals = {};
         const yearTotals = {};
-        const sessionCountsByDay = {};
         sessionHistory.forEach((session) => {
             window.FocusAnalytics.splitSessionByDay(session).forEach((chunk) => {
                 dayTotals[chunk.dayKey] = (dayTotals[chunk.dayKey] || 0) + chunk.seconds;
@@ -523,34 +503,12 @@ function initializeFocusMode() {
                 monthTotals[monthKey] = (monthTotals[monthKey] || 0) + chunk.seconds;
                 yearTotals[yearKey] = (yearTotals[yearKey] || 0) + chunk.seconds;
             });
-            const startKey = window.FocusAnalytics.toDayKey
-                ? window.FocusAnalytics.toDayKey(new Date(session.startTime))
-                : getLocalDayKey(new Date(session.startTime));
-            sessionCountsByDay[startKey] = (sessionCountsByDay[startKey] || 0) + 1;
         });
-        const mergedDayTotals = { ...existingDayTotals };
-        Object.entries(dayTotals).forEach(([key, value]) => {
-            mergedDayTotals[key] = Math.max(existingDayTotals[key] || 0, value || 0);
-        });
-        const mergedMonthTotals = { ...existingMonthTotals };
-        Object.entries(monthTotals).forEach(([key, value]) => {
-            mergedMonthTotals[key] = Math.max(existingMonthTotals[key] || 0, value || 0);
-        });
-        const mergedYearTotals = { ...existingYearTotals };
-        Object.entries(yearTotals).forEach(([key, value]) => {
-            mergedYearTotals[key] = Math.max(existingYearTotals[key] || 0, value || 0);
-        });
-        sessionStats.activityByDay = mergedDayTotals;
-        sessionStats.activityByMonth = mergedMonthTotals;
-        sessionStats.activityByYear = mergedYearTotals;
-
-        const todayKey = getLocalDayKey();
-        if (dayTotals[todayKey] !== undefined) {
-            sessionStats.totalFocusTimeSeconds = dayTotals[todayKey] || 0;
-        }
-        if (sessionCountsByDay[todayKey] !== undefined) {
-            sessionStats.sessionsCompleted = sessionCountsByDay[todayKey] || 0;
-        }
+        sessionStats.activityByDay = dayTotals;
+        sessionStats.activityByMonth = monthTotals;
+        sessionStats.activityByYear = yearTotals;
+        sessionStats.totalFocusTimeSeconds = Object.values(dayTotals).reduce((sum, value) => sum + (value || 0), 0);
+        sessionStats.sessionsCompleted = sessionHistory.length;
 
         if (window.FocusAnalytics.getStreaks) {
             const streaks = window.FocusAnalytics.getStreaks(sessionHistory);
@@ -587,21 +545,20 @@ function initializeFocusMode() {
             sessionStats.activityByYear[keys.year] = (sessionStats.activityByYear[keys.year] || 0) + sessionDuration;
             sessionStats.totalFocusTimeSeconds += sessionDuration;
             sessionStats.sessionsCompleted++;
-            sessionStats.currentStreak++;
             sessionRuntimeSeconds += sessionDuration;
             lastSessionSeconds = sessionDuration;
             sessionStats.currentSessionStartTime = null;
             sessionStats.currentSessionInitialTime = 0;
             sessionStats.pausedAt = null;
             sessionStats.accumulatedPauseTime = 0;
-            saveStats();
+            await saveStats();
             if (window.FocusStorage && window.FocusStorage.recordCompletedSession) {
                 await window.FocusStorage.recordCompletedSession(sessionRecord);
             }
             if (Array.isArray(sessionHistory)) {
                 sessionHistory.push(sessionRecord);
             }
-            saveStats();
+            rebuildAggregatesFromHistory();
             updateStatsDisplay();
             updateProgressRing();
             refreshStatsDashboard();
@@ -631,7 +588,7 @@ function initializeFocusMode() {
             if (window.FocusStorage && window.FocusStorage.resetAllStats) {
                 await window.FocusStorage.resetAllStats();
             }
-            saveStats();
+            await saveStats();
             updateStatsDisplay();
             updateProgressRing();
             sessionStatusEl.textContent = 'Not Started';
@@ -708,6 +665,17 @@ function initializeFocusMode() {
         if (waterBreakRemainingMs === null || waterBreakRemainingMs <= 0) {
             waterBreakRemainingMs = intervalMs;
         }
+        if (deadline) {
+            const remainingMs = Math.max(0, deadline - Date.now());
+            const nextBreakMs = waterBreakRemainingMs > 0 ? waterBreakRemainingMs : intervalMs;
+            if (remainingMs <= nextBreakMs + 500) {
+                clearTimeout(waterTimeoutId);
+                waterTimeoutId = null;
+                nextBreakAtMs = null;
+                waterBreakRemainingMs = null;
+                return;
+            }
+        }
         clearTimeout(waterTimeoutId);
         nextBreakAtMs = Date.now() + waterBreakRemainingMs;
         const delay = Math.max(0, waterBreakRemainingMs);
@@ -726,6 +694,12 @@ function initializeFocusMode() {
     }
 
     function triggerWaterBreak() {
+        if (!timerId || !deadline) return;
+        const remainingMs = Math.max(0, deadline - Date.now());
+        if (remainingMs <= 1000) {
+            waterBreakRemainingMs = null;
+            return;
+        }
         waterBreakActive = true;
         pauseTimer({ forWaterBreak: true });
         showWaterBreakModal();
@@ -822,7 +796,7 @@ function initializeFocusMode() {
                 
                 startTimerEndAlarm();
                 timerEndModal.style.display = 'flex';
-                suppressAutoStartUntil = Date.now() + 400;
+                suppressAutoStartUntil = Date.now() + 1500;
                 waterBreakRemainingMs = null;
                 waterBreakActive = false;
                 clearTimeout(waterTimeoutId); waterTimeoutId = null; nextBreakAtMs = null;
@@ -904,7 +878,10 @@ function initializeFocusMode() {
         stopStatsTracking();
         sessionStats.currentSessionStartTime = null;
         sessionStats.currentSessionInitialTime = 0;
-        sessionStats.currentStreak = 0; // Reset streak on manual reset
+        if (window.FocusAnalytics && window.FocusAnalytics.getStreaks && Array.isArray(sessionHistory)) {
+            const streaks = window.FocusAnalytics.getStreaks(sessionHistory);
+            sessionStats.currentStreak = streaks.current || 0;
+        }
         sessionStats.pausedAt = null;
         sessionStats.accumulatedPauseTime = 0;
         saveStats();
@@ -1221,10 +1198,16 @@ function initializeFocusMode() {
     });
 
     // Close timer end modal and stop sound
-    closeTimerButton.addEventListener('click', () => {
+    closeTimerButton.addEventListener('click', (event) => {
+        if (event) {
+            event.preventDefault();
+            event.stopPropagation();
+        }
         stopTimerEndAlarm();
-        timerEndModal.style.display = 'none';
-        suppressAutoStartUntil = Date.now() + 400;
+        requestAnimationFrame(() => {
+            timerEndModal.style.display = 'none';
+        });
+        suppressAutoStartUntil = Date.now() + 1500;
         updateStatsDisplay();
         updateProgressRing();
     });
