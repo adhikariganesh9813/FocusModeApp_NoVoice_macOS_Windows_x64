@@ -76,6 +76,10 @@ function initializeFocusMode() {
     let dailyWeekOffset = 0;
 
     async function loadStats() {
+        // Load session history first so we can sync today's stats
+        if (window.FocusStorage && window.FocusStorage.loadSessions) {
+            sessionHistory = await window.FocusStorage.loadSessions();
+        }
         if (window.FocusStorage && window.FocusStorage.loadAggregates) {
             const aggregates = await window.FocusStorage.loadAggregates();
             sessionStats = { ...sessionStats, ...aggregates };
@@ -406,8 +410,11 @@ function initializeFocusMode() {
         saveStats();
 
         statsUpdateInterval = setInterval(() => {
+            // Check if day has changed and update stats accordingly
+            ensureDailyStats({ persist: true, preserveSession: true });
             updateProgressRing();
             updateSessionStatusText();
+            updateStatsDisplay();
         }, 1000);
     }
 
@@ -461,6 +468,8 @@ function initializeFocusMode() {
             resetDailyStats({ preserveSession });
             sessionStats.lastStatsDate = todayKey;
             sessionStats.lastSessionDate = todayKey;
+            // Restore today's stats from session history after day change
+            syncTodayStatsFromHistory();
             if (persist) {
                 saveStats();
             }
@@ -488,6 +497,11 @@ function initializeFocusMode() {
         if (!today) return;
         sessionStats.totalFocusTimeSeconds = today.totalSeconds || 0;
         sessionStats.sessionsCompleted = today.sessionsCount || 0;
+        // Also update current streak from session history
+        if (window.FocusAnalytics.getStreaks) {
+            const streaks = window.FocusAnalytics.getStreaks(sessionHistory);
+            sessionStats.currentStreak = streaks.current || 0;
+        }
     }
 
     function rebuildAggregatesFromHistory() {
@@ -751,8 +765,11 @@ function initializeFocusMode() {
                 // Restart the interval if it was stopped
                 if (!statsUpdateInterval) {
                     statsUpdateInterval = setInterval(() => {
+                        // Check if day has changed and update stats accordingly
+                        ensureDailyStats({ persist: true, preserveSession: true });
                         updateProgressRing();
                         updateSessionStatusText();
+                        updateStatsDisplay();
                     }, 1000);
                 }
             }
