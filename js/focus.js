@@ -940,25 +940,39 @@ function initializeFocusMode() {
         }
         const speech = window.speechSynthesis;
         speech.cancel();
+        
+        // Get better voice for alarm
+        const voices = speech.getVoices();
+        const preferredVoice = voices.find(voice => 
+            voice.lang.startsWith('en') && 
+            (voice.name.includes('Samantha') || voice.name.includes('Natural') || voice.name.includes('Premium'))
+        ) || voices.find(voice => voice.lang.startsWith('en') && !voice.name.includes('Novelty'));
+        
         const speakLoop = () => {
             if (!timerEndVoiceActive) return;
-            const utterance = new SpeechSynthesisUtterance('Session End');
-            utterance.rate = 1.0;
+            const utterance = new SpeechSynthesisUtterance('Session complete');
+            utterance.rate = 0.95;
             utterance.pitch = 1.0;
+            utterance.volume = 0.8;
+            if (preferredVoice) utterance.voice = preferredVoice;
+            
             utterance.onend = () => {
                 if (timerEndVoiceActive) {
-                    timerEndVoiceTimeoutId = setTimeout(speakLoop, 1200);
+                    timerEndVoiceTimeoutId = setTimeout(speakLoop, 1500);
                 }
             };
             speech.speak(utterance);
         };
         speakLoop();
+        
         setTimeout(() => {
             if (!timerEndVoiceActive) return;
             if (!speech.speaking) {
-                const fallback = new SpeechSynthesisUtterance('Session End');
-                fallback.rate = 1.0;
+                const fallback = new SpeechSynthesisUtterance('Session complete');
+                fallback.rate = 0.95;
                 fallback.pitch = 1.0;
+                fallback.volume = 0.8;
+                if (preferredVoice) fallback.voice = preferredVoice;
                 speech.speak(fallback);
             }
         }, 300);
@@ -995,9 +1009,23 @@ function initializeFocusMode() {
     function speakStatus(message) {
         if (!message) return;
         if (!('speechSynthesis' in window)) return;
+        
         const utterance = new SpeechSynthesisUtterance(message);
-        utterance.rate = 1.0;
+        utterance.rate = 0.95;
         utterance.pitch = 1.0;
+        utterance.volume = 0.8;
+        
+        // Try to use a more natural voice
+        const voices = window.speechSynthesis.getVoices();
+        const preferredVoice = voices.find(voice => 
+            voice.lang.startsWith('en') && 
+            (voice.name.includes('Samantha') || voice.name.includes('Natural') || voice.name.includes('Premium'))
+        ) || voices.find(voice => voice.lang.startsWith('en') && !voice.name.includes('Novelty'));
+        
+        if (preferredVoice) {
+            utterance.voice = preferredVoice;
+        }
+        
         window.speechSynthesis.cancel();
         window.speechSynthesis.speak(utterance);
     }

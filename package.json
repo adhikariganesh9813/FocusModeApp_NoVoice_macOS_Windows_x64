@@ -30,8 +30,9 @@
       ],
       "icon": "build/icon.icns",
       "category": "public.app-category.productivity",
-      "hardenedRuntime": true,
-      "entitlements": "build/entitlements.mac.plist"
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false,
+      "identity": null
     },
     "win": {
       "target": [
