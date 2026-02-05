@@ -47,9 +47,39 @@
     return { schemaVersion: SCHEMA_VERSION, sessionHistory: raw.sessionHistory || [], ...raw };
   }
 
+  function buildHistoryFromAggregates(aggregates) {
+    const activityByDay = aggregates && aggregates.activityByDay ? aggregates.activityByDay : {};
+    const entries = Object.entries(activityByDay).filter(([, seconds]) => Number.isFinite(seconds) && seconds > 0);
+    if (!entries.length) return [];
+    return entries
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([dayKey, seconds]) => {
+        const start = new Date(`${dayKey}T12:00:00`);
+        const durationSeconds = Math.max(0, Math.round(seconds));
+        const end = new Date(start.getTime() + (durationSeconds * 1000));
+        const startIso = start.toISOString();
+        const endIso = end.toISOString();
+        return {
+          id: `day-${dayKey}`,
+          startTime: startIso,
+          endTime: endIso,
+          durationSeconds,
+          type: 'focus',
+          completed: true,
+          createdAt: endIso
+        };
+      });
+  }
+
   async function migrateIfNeeded() {
     const raw = await readRawStats();
     const next = ensureSchema(raw);
+    if (Array.isArray(next.sessionHistory) && next.sessionHistory.length === 0) {
+      const rebuilt = buildHistoryFromAggregates(next);
+      if (rebuilt.length) {
+        next.sessionHistory = rebuilt;
+      }
+    }
     if (!raw || raw.schemaVersion !== next.schemaVersion || raw.sessionHistory !== next.sessionHistory) {
       await writeRawStats(next);
     }
@@ -70,7 +100,7 @@
   }
 
   async function loadSessions() {
-    const data = ensureSchema(await readRawStats());
+    const data = await migrateIfNeeded();
     return Array.isArray(data.sessionHistory) ? data.sessionHistory : [];
   }
 
