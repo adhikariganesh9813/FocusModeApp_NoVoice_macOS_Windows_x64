@@ -11,6 +11,45 @@ const statsFilePath = () => path.join(app.getPath('userData'), 'focus-stats.json
 const statsBackupPath = () => `${statsFilePath()}.bak`;
 const statsTempPath = () => `${statsFilePath()}.tmp`;
 
+async function fsyncFile(filePath) {
+  const handle = await fs.open(filePath, 'r');
+  try {
+    await handle.sync();
+  } finally {
+    await handle.close();
+  }
+}
+
+async function fsyncDirectory(dirPath) {
+  try {
+    const handle = await fs.open(dirPath, 'r');
+    try {
+      await handle.sync();
+    } finally {
+      await handle.close();
+    }
+  } catch (err) {
+    // Some environments do not allow fsync on directories.
+    if (err && err.code !== 'EINVAL' && err.code !== 'ENOTSUP' && err.code !== 'EISDIR' && err.code !== 'EPERM') {
+      throw err;
+    }
+  }
+}
+
+async function writeAtomicJson(targetPath, tempPath, payload) {
+  await fs.writeFile(tempPath, payload, 'utf-8');
+  await fsyncFile(tempPath);
+  try {
+    await fs.rename(tempPath, targetPath);
+  } catch (renameErr) {
+    if (fsSync.existsSync(targetPath)) {
+      await fs.unlink(targetPath);
+    }
+    await fs.rename(tempPath, targetPath);
+  }
+  await fsyncDirectory(path.dirname(targetPath));
+}
+
 function tryParseStats(raw) {
   if (!raw || typeof raw !== 'string') return { data: null, repaired: null };
   try {
@@ -37,7 +76,7 @@ async function readStatsFile() {
     const parsed = tryParseStats(data);
     if (parsed.data) {
       if (parsed.repaired) {
-        await fs.writeFile(statsPath, parsed.repaired, 'utf-8');
+        await writeAtomicJson(statsPath, statsTempPath(), parsed.repaired);
       }
       return parsed.data;
     }
@@ -77,16 +116,10 @@ async function writeStatsFile(stats) {
     await fs.mkdir(path.dirname(statsPath), { recursive: true });
     if (fsSync.existsSync(statsPath)) {
       await fs.copyFile(statsPath, backupPath);
+      await fsyncFile(backupPath);
     }
-    await fs.writeFile(tempPath, JSON.stringify(stats, null, 2), 'utf-8');
-    try {
-      await fs.rename(tempPath, statsPath);
-    } catch (renameErr) {
-      if (fsSync.existsSync(statsPath)) {
-        await fs.unlink(statsPath);
-      }
-      await fs.rename(tempPath, statsPath);
-    }
+    const payload = JSON.stringify(stats, null, 2);
+    await writeAtomicJson(statsPath, tempPath, payload);
     return true;
   } catch (err) {
     console.error('Failed to write stats file:', err);
